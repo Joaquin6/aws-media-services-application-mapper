@@ -24,8 +24,15 @@
                        for (let node of nodes) {
                            let selected = node.render.normal_selected();
                            let unselected = node.render.normal_unselected();
-   
-                           if (node.degraded) {
+
+                           if (_.has(node, 'idle') && _.has(node.data, 'idle_state')) {
+                            node.data.idle_state = node.idle;
+                           }
+
+                           if (_.has(node, 'idle') && node.idle || (_.has(node.data, 'idle_state') && node.data.idle_state)) {
+                                selected = node.render.idle_selected();
+                                unselected = node.render.idle_unselected();
+                            } else if (node.degraded) {
                                selected = node.render.degraded_selected();
                                unselected = node.render.degraded_unselected();
                            } else if (node.alerting || node.alarming) {

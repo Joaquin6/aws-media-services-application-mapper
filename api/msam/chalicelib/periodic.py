@@ -74,23 +74,10 @@ def update_nodes():
     """
     Entry point for the CloudWatch scheduled task to discover and cache services.
     """
+    settings_key = "cache-next-region"
+    never_regions_key = "never-cache-regions"
     try:
-        never_regions_key = "never-cache-regions"
-        never_regions = msam_settings.get_setting(never_regions_key)
-        if never_regions is None:
-            never_regions = []
-        settings_key = "cache-next-region"
-        # make a region name list
-        region_name_list = []
-        for region in regions():
-            region_name = region["RegionName"]
-            # exclude regions listed in never-cache setting
-            if region_name not in never_regions:
-                region_name_list.append(region_name)
-            else:
-                print("{} in {} setting".format(region_name, never_regions_key))
-        # sort it
-        region_name_list.sort()
+        region_name_list = node_cache.get_region_list()
         # get the next region to process
         next_region = msam_settings.get_setting(settings_key)
         # start at the beginning if no previous setting

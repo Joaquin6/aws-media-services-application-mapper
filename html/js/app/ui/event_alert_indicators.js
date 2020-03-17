@@ -8,7 +8,10 @@ define(["jquery", "lodash", "app/model", "app/events", "app/ui/diagrams"],
             let selected = null;
             let unselected = null;
 
-            if (node.degraded) {
+            if (node.idle) {
+                selected = node.render.idle_selected();
+                unselected = node.render.idle_unselected();
+            } else if (node.degraded) {
                 selected = node.render.degraded_selected();
                 unselected = node.render.degraded_unselected();
             } else if (node.alerting) {
@@ -35,6 +38,7 @@ define(["jquery", "lodash", "app/model", "app/events", "app/ui/diagrams"],
 
         const updateEventAlertState = (current_alerts, previous_alerts) => {
             /** iterate through current 'set' alerts */
+            const idle_nodes = [];
             const alerting_nodes = [];
             const inactive_nodes = [];
             const degraded_nodes = [];
@@ -46,8 +50,15 @@ define(["jquery", "lodash", "app/model", "app/events", "app/ui/diagrams"],
                     node.alerting = true;
                     node.degraded = _.has(item, "detail") && _.has(item.detail, "degraded")
                         ? item.detail.degraded : false;
+                    node.idle = _.has(item, "detail") && _.has(item.detail, "idle_state")
+                        ? item.detail.idle_state : false;                    
 
-                    if (node.degraded) {
+                    if (node.idle) {
+                        if (!idle_nodes.includes(item.resource_arn)) {
+                            idle_nodes.push(item.resource_arn);
+                            updateAlertHandler(node, false);
+                        }
+                    } else if (node.degraded) {
                         if (!degraded_nodes.includes(item.resource_arn)) {
                             degraded_nodes.push(item.resource_arn);
                             updateAlertHandler(node);
@@ -58,7 +69,9 @@ define(["jquery", "lodash", "app/model", "app/events", "app/ui/diagrams"],
                          * is not included in the degraded_nodes array. If it is, that means
                          * the other pipeline is degraded, therefore we do not alert.
                          */
-                        if (!alerting_nodes.includes(item.resource_arn) && !degraded_nodes.includes(item.resource_arn)) {
+                        if (!alerting_nodes.includes(item.resource_arn) && 
+                            !degraded_nodes.includes(item.resource_arn) && 
+                            !idle_nodes.includes(item.resource_arn)) {
                             alerting_nodes.push(item.resource_arn);
                             updateAlertHandler(node);
                         }
@@ -88,6 +101,7 @@ define(["jquery", "lodash", "app/model", "app/events", "app/ui/diagrams"],
 
                 if (node) {
                     node.alerting = false;
+                    node.idle = _.includes(idle_nodes, arn);
                     node.degraded = _.includes(degraded_nodes, arn);
 
                     updateAlertHandler(node, false);

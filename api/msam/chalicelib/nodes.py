@@ -16,6 +16,7 @@ from botocore.exceptions import ClientError
 from botocore.exceptions import EndpointConnectionError
 from jsonpath_ng import parse
 
+from chalicelib import settings
 from chalicelib import content
 from chalicelib import cache
 
@@ -35,11 +36,7 @@ def update_regional_ddb_items(region_name):
         content.put_ddb_items(medialive_input_ddb_items(region_name))
     except (ClientError, EndpointConnectionError) as error:
         print(error)
-    try:
-        print("medialive-channel")
-        content.put_ddb_items(medialive_channel_ddb_items(region_name))
-    except (ClientError, EndpointConnectionError) as error:
-        print(error)
+    update_medialive_channels(region_name)
     try:
         print("medialive-multiplex")
         content.put_ddb_items(medialive_multiplex_ddb_items(region_name))
@@ -101,6 +98,22 @@ def update_global_ddb_items():
         content.put_ddb_items(cloudfront_distribution_ddb_items())
     except (ClientError, EndpointConnectionError) as error:
         print(error)
+
+
+def update_medialive_channels(region_name):
+    """
+    Update all medialive channels in the cache for a region.
+    """
+    items = []
+    try:
+        print("medialive-channel")
+        channels = medialive_channel_ddb_items(region_name)
+        if len(channels) > 0:
+            items = items + channels
+        content.put_ddb_items(items)
+    except (ClientError, EndpointConnectionError) as error:
+        print(error)
+    return items
 
 
 def s3_bucket_ddb_items():
@@ -575,3 +588,28 @@ def ec2_instances(region):
     else:
         print("not available in this region")
     return items
+
+
+def get_region_list():
+    """
+    Get the region list of the current account.
+    """
+    region_name_list = []
+    settings_key = "cache-next-region"
+    never_regions_key = "never-cache-regions"
+    try:
+        never_regions = settings.get_setting(never_regions_key)
+        if never_regions is None:
+            never_regions = []
+        for region in cache.regions():
+            region_name = region["RegionName"]
+            # exclude regions listed in never-cache setting
+            if region_name not in never_regions:
+                region_name_list.append(region_name)
+            else:
+                print("{} in {} setting".format(region_name, never_regions_key))
+        # sort it
+        region_name_list.sort()
+    except ClientError as error:
+        print(error)
+    return region_name_list

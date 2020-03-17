@@ -10,6 +10,7 @@ define(["jquery", "lodash", "app/window", "app/ui/util", "app/plugins"], functio
     const border_rgb = "#a6a6a6";
     const selected_border_rgb = "#262626";
     const degraded_rgb = "#ffff33";
+    const idle_rgb = "#949898";
 
     const wordWrap = (str, max) => str.length > max ? [`${str.substring(0, max - 1)} [...]`] : [str];
 
@@ -80,6 +81,7 @@ define(["jquery", "lodash", "app/window", "app/ui/util", "app/plugins"], functio
             create(type_name, node_name, node_rgb, true, id),
         unselected: (type_name, node_name, node_rgb, id) => 
             create(type_name, node_name, node_rgb, false, id),
-        getDegradedRgb: () => degraded_rgb
+        getIdleRgb: () => idle_rgb,
+        getDegradedRgb: () => degraded_rgb,
     };
 });

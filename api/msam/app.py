@@ -19,7 +19,7 @@ import chalicelib.settings as msam_settings
 app = Chalice(app_name='msam')
 
 # update one region at this interval
-NODE_UPDATE_RATE_MINUTES = 5
+NODE_UPDATE_RATE_MINUTES = 1
 
 # update connections at this interval
 CONNECTION_UPDATE_RATE_MINUTES = 5
@@ -76,6 +76,14 @@ def get_channel_list():
     API entry point to return all the current channel names.
     """
     return channel_tiles.get_channel_list()
+
+
+@app.route('/channels/state/{state}', cors=True, api_key_required=True, methods=['GET'])
+def get_channel_state_list(state):
+    """
+    API entry point to return all the current channel with the given state.
+    """
+    return channel_tiles.get_channel_state_list(state)
 
 
 @app.route('/channel/{name}', cors=True, api_key_required=True, methods=['PUT', 'POST'], content_types=['application/json', 'application/x-www-form-urlencoded'])
