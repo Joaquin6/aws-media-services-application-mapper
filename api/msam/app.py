@@ -9,8 +9,10 @@ import time
 
 import boto3
 from chalice import Chalice, Rate
+from chalice import BadRequestError
 
 from chalicelib import cache
+from chalicelib import connections
 import chalicelib.channels as channel_tiles
 import chalicelib.cloudwatch as cloudwatch_data
 import chalicelib.layout as node_layout
@@ -67,6 +69,21 @@ SSM_EVENT_PATTERN = {
     ]
   }
 }
+
+@app.route('/activepaths', cors=True, api_key_required=True, methods=['GET'])
+def get_activepaths_list():
+    """
+    API entry point to return all the active connection arns.
+    """
+    req = app.current_request
+    arn = req.query_params.get('arn')
+    if not arn:
+        errmsg = "ARN query parameter is required."
+        app.log.error(errmsg)
+        raise BadRequestError(errmsg)
+    else:
+        return connections.get_activepaths_list(arn)
+
 
 @app.route('/layout/view/{view}', cors=True, api_key_required=True, methods=['GET'])
 def get_view_layout(view):

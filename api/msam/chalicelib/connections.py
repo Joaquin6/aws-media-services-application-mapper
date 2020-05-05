@@ -8,14 +8,13 @@ import json
 import os
 import re
 import time
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 
 from botocore.exceptions import ClientError
 from fuzzywuzzy import fuzz
 from jsonpath_ng import parse
 
-from chalicelib import cache
-from chalicelib import content
+from chalicelib import cache, content, cloudwatch
 
 # TTL provided via CloudFormation
 CACHE_ITEM_TTL = int(os.environ["CACHE_ITEM_TTL"])
@@ -72,6 +71,19 @@ def fetch_running_pipelines_count(data):
             pipelines_count = len(data["Destinations"])
     return pipelines_count
     
+
+def get_activepaths_list(resource_arn):
+    """
+    Retrieve all the active connection arns by the given arn.
+    """
+    active_connections = []
+    try:
+        medialive_cached = cache.cached_by_arn(resource_arn)
+        active_connections.append(medialive_cached)
+    except ClientError as error:
+        print(error)
+    return active_connections
+
 
 def update_connection_ddb_items():
     """
@@ -274,12 +286,68 @@ def medialive_input_medialive_channel_ddb_items():
     return items
 
 
+def medialive_channel_activepaths_list(resource_arn):
+    """
+    Retrieve all the active medialive channel connection arns.
+    """
+    active_connections = []
+    ml_service_name = "medialive-channel"
+    try:
+        resource_arn = unquote(resource_arn)
+        channels_cached = cache.cached_by_arn(resource_arn)
+    except ClientError as error:
+        print(error)
+    return active_connections
+
+
+def medialive_input_activepaths_list(resource_arn):
+    """
+    Retrieve all the active medialive input connection arns.
+    """
+    active_connections = []
+    ml_service_name = "medialive-input"
+    try:
+        resource_arn = unquote(resource_arn)
+        inputs_cached = cache.cached_by_arn(resource_arn)
+    except ClientError as error:
+        print(error)
+    return active_connections
+
+
+def medialive_activepaths_list(resource_arn):
+    """
+    Retrieve all the active medialive connection arns.
+    """
+    active_connections = []
+    try:
+        resource_arn = unquote(resource_arn)
+        medialive_cached = cache.cached_by_arn(resource_arn)
+    except ClientError as error:
+        print(error)
+    return active_connections
+
+
+def mediapackage_activepaths_list(resource_arn):
+    """
+    Retrieve all the active mediapackage connection arns.
+    """
+    active_connections = []
+    ml_service_name = "mediapackage"
+    try:
+        resource_arn = unquote(resource_arn)
+        mediapackages_cached = cache.cached_by_arn(resource_arn)
+    except ClientError as error:
+        print(error)
+    return active_connections
+
+
 def mediapackage_channel_mediapackage_endpoint_ddb_items():
     """
     Identify and format MediaPackage channel to MediaPackage endpoint connections for cache storage.
     """
     items = []
     package_key = re.compile("^(.+)Package$")
+    connection_type = "mediapackage-channel-mediapackage-origin-endpoint"
     try:
         # get mediapackage channels
         mediapackage_ch_cached = cache.cached_by_service("mediapackage-channel")
@@ -300,7 +368,7 @@ def mediapackage_channel_mediapackage_endpoint_ddb_items():
                             package_type = matcher.group(1).upper()
                     config = {"from": mp_channel_data["Arn"], "to": mp_endpoint_data["Arn"], "package": package_type}
                     print(config)
-                    items.append(connection_to_ddb_item(mp_channel_data["Arn"], mp_endpoint_data["Arn"], "mediapackage-channel-mediapackage-origin-endpoint", config))
+                    items.append(connection_to_ddb_item(mp_channel_data["Arn"], mp_endpoint_data["Arn"], connection_type, config))
     except ClientError as error:
         print(error)
     return items
