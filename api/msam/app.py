@@ -6,6 +6,7 @@ This file contains the REST API and CloudWatch entry-points for the MSAM backend
 
 import os
 import time
+from urllib.parse import unquote
 
 import boto3
 from chalice import Chalice, Rate
@@ -76,12 +77,13 @@ def get_activepaths_list():
     API entry point to return all the active connection arns.
     """
     req = app.current_request
-    arn = req.query_params.get('arn')
-    if not arn:
+    arn = unquote(req.query_params.get('arn'))
+    if not arn or arn is None:
         errmsg = "ARN query parameter is required."
         app.log.error(errmsg)
         raise BadRequestError(errmsg)
     else:
+        app.log.debug('Active Paths - Resource ARN {}'.format(arn))
         return connections.get_activepaths_list(arn)
 
 

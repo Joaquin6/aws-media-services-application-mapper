@@ -8,7 +8,7 @@ import os
 from urllib.parse import unquote
 
 import boto3
-from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.conditions import Attr, Key
 from botocore.exceptions import ClientError
 from botocore.config import Config
 
@@ -49,6 +49,7 @@ def cached_by_service_region(service, region):
     API entry point to retrieve items from the cache under the service and region name.
     """
     try:
+        items = []
         service = unquote(service)
         region = unquote(region)
         ddb_table_name = CONTENT_TABLE_NAME
@@ -79,6 +80,26 @@ def cached_by_arn(arn):
         items = response["Items"]
         while "LastEvaluatedKey" in response:
             response = ddb_table.query(KeyConditionExpression=Key('arn').eq(arn), ExclusiveStartKey=response['LastEvaluatedKey'])
+            items = items + response["Items"]
+        return items
+    except ClientError as error:
+        print(error)
+        return {"message": str(error)}
+
+
+def cached_by_arn_contains(arn):
+    """
+    API entry point to retrieve an item from the cache containing the ARN.
+    """
+    try:
+        arn = unquote(arn)
+        ddb_table_name = CONTENT_TABLE_NAME
+        ddb_resource = boto3.resource('dynamodb', config=MSAM_BOTO3_CONFIG)
+        ddb_table = ddb_resource.Table(ddb_table_name)
+        response = ddb_table.scan(FilterExpression=Attr('arn').contains(arn))
+        items = response["Items"]
+        while "LastEvaluatedKey" in response:
+            response = ddb_table.scan(FilterExpression=Attr('arn').contains(arn), ExclusiveStartKey=response['LastEvaluatedKey'])
             items = items + response["Items"]
         return items
     except ClientError as error:

@@ -11,6 +11,7 @@ import time
 from urllib.parse import urlparse, unquote
 
 from botocore.exceptions import ClientError
+from botocore.config import Config
 from fuzzywuzzy import fuzz
 from jsonpath_ng import parse
 
@@ -18,7 +19,10 @@ from chalicelib import cache, content, cloudwatch
 
 # TTL provided via CloudFormation
 CACHE_ITEM_TTL = int(os.environ["CACHE_ITEM_TTL"])
+EVENTS_TABLE_NAME = os.environ["EVENTS_TABLE_NAME"]
+STAMP = os.environ["BUILD_STAMP"]
 
+MSAM_BOTO3_CONFIG = Config(user_agent="aws-media-services-applications-mapper/{stamp}/connections.py".format(stamp=STAMP))
 
 def connection_item(arn, from_arn, to_arn, service, config):
     """
@@ -76,10 +80,28 @@ def get_activepaths_list(resource_arn):
     """
     Retrieve all the active connection arns by the given arn.
     """
+    print('Active Paths - Resource ARN {}'.format(resource_arn))
     active_connections = []
     try:
-        medialive_cached = cache.cached_by_arn(resource_arn)
-        active_connections.append(medialive_cached)
+        cachedata = cache.cached_by_arn_contains(resource_arn)
+        resource_events = cloudwatch.get_cloudwatch_events_resource(resource_arn)
+        grouped_events = cloudwatch.group_events(resource_events);
+        print('Active Paths - Cached: {} - Events: '.format(len(cachedata)), len(resource_events))
+        def get_running_events(cached_content):
+            running_events = []
+            for running_event in grouped_events["running"]:
+                if running_event["resource_arn"] == cached_content["arn"]:
+                    running_events.append(running_event)
+            return running_events;
+        for cached in cachedata:
+            data = json.loads(cached["data"])
+            def is_same_service(i):
+                return bool(i["service"] == cached["service"])
+            same_services = list(filter(is_same_service, cachedata))
+            for same_service in same_services:
+                running_evts = get_running_events(same_service);
+                if len(running_evts) > 0 and same_service["arn"] not in active_connections:
+                    active_connections.append(same_service["arn"])
     except ClientError as error:
         print(error)
     return active_connections

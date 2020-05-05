@@ -218,43 +218,65 @@ def get_cloudwatch_events_state(state):
     return events
 
 
-def get_cloudwatch_events_state_groups(state):
-    """
-    Group all events by down, degraded and running pipelines
-    """
+def group_events(events):
     group = {}
     group["down"] = []
     group["running"] = []
     group["degraded"] = []
-    events = get_cloudwatch_events_state(state)
-    for event in events:
+    def ensure_details(evt):
+        if "detail" not in evt:
+            if "data" in evt:
+                evt["detail"] = json.loads(evt["data"])
+            else:
+                evt["detail"] = {}
+        if "pipeline" not in evt["detail"]:
+            evt["detail"]["pipeline"] = str(0)
+        return evt
+    for eventdata in events:
+        event = ensure_details(eventdata)
         arn = event["resource_arn"]
         pl = event["detail"]["pipeline"]
-        def is_same_arn(i):
+        def is_same_arn(d):
+            i = ensure_details(d)
             return bool(i["resource_arn"] == arn)
-        def is_same_pl(i):
+        def is_same_pl(d):
+            i = ensure_details(d)
             return bool("pipeline" in i["detail"] and i["detail"]["pipeline"] == pl)
-        def is_diff_pl(i):
+        def is_diff_pl(d):
+            i = ensure_details(d)
             return bool("pipeline" in i["detail"] and i["detail"]["pipeline"] != pl)
-        def is_pl_down(i):
+        def is_pl_down(d):
+            i = ensure_details(d)
             return bool("pipeline_state" in i["detail"] and not i["detail"]["pipeline_state"])
         same_arn_events = list(filter(is_same_arn, events))
         all_down_pipelines = list(filter(is_pl_down, same_arn_events))
         same_down_pipelines = list(filter(is_same_pl, all_down_pipelines))
         diff_down_pipelines = list(filter(is_diff_pl, all_down_pipelines))
         if len(diff_down_pipelines) > 0 and len(same_down_pipelines) == 0:
+            event["detail"]["running"] = bool(False)
             event["detail"]["degraded"] = bool(True)
             group["degraded"].append(event)
         elif len(diff_down_pipelines) == 0 and len(same_down_pipelines) > 0:
+            event["detail"]["running"] = bool(False)
             event["detail"]["degraded"] = bool(True)
             group["degraded"].append(event)
         elif len(diff_down_pipelines) > 0 and len(same_down_pipelines) > 0:
+            event["detail"]["running"] = bool(False)
             event["detail"]["degraded"] = bool(False)
             group["down"].append(event)
         else:
+            event["detail"]["running"] = bool(True)
             event["detail"]["degraded"] = bool(False)
             group["running"].append(event)
     return group
+
+
+def get_cloudwatch_events_state_groups(state):
+    """
+    Group all events by down, degraded and running pipelines
+    """
+    events = get_cloudwatch_events_state(state)
+    return group_events(events)
 
 
 def get_cloudwatch_events_resource(resource_arn, start_time=0, end_time=0):
